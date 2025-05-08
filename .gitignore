@@ -1,6 +1,10 @@
 ./env/*
+myenv/*
 *yaml
 *csv
 *xlsx
 *json
 TP/*
+data/*
+temp.html
+TRASH/*

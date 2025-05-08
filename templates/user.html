@@ -1,0 +1,110 @@
+{% extends "login.html" %}
+
+{% block title %}Search Details for a Specific User{% endblock %}
+
+{% block styles %}
+<style>
+    body {
+        font-family: Arial, sans-serif;
+        margin: 0;
+        padding: 0;
+        background-color: #f8f9fa;
+        color: #333;
+    }
+
+    h1 {
+        text-align: center;
+        margin-top: 20px;
+    }
+
+    .search-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        margin-top: 50px;
+    }
+
+    .search-container textarea {
+        width: 300px;
+        height: 50px;
+        padding: 10px;
+        border-radius: 5px;
+        border: 1px solid #ccc;
+        font-size: 16px;
+        margin-bottom: 20px;
+    }
+
+    .search-container button {
+        padding: 10px 20px;
+        border: none;
+        border-radius: 5px;
+        background-color: #007bff;
+        color: white;
+        font-weight: bold;
+        cursor: pointer;
+    }
+
+    .search-container button:hover {
+        background-color: #0056b3;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<h1>Search Details for a Specific User</h1>
+
+<div class="search-container">
+    <textarea id="username" placeholder="Enter username"></textarea>
+    <button onclick="searchUser()">Search</button>
+</div>
+
+<div id="results"></div>
+
+<script>
+    function createTableFromObject(obj) {
+        let html = '<table border="1" cellpadding="8" cellspacing="0" style="margin: 10px auto; border-collapse: collapse;">';
+        html += '<thead><tr>';
+        for (let key in obj[0]) {
+            html += `<th>${key}</th>`;
+        }
+        html += '</tr></thead><tbody>';
+        for (let row of obj) {
+            html += '<tr>';
+            for (let key in row) {
+                html += `<td>${row[key]}</td>`;
+            }
+            html += '</tr>';
+        }
+        html += '</tbody></table>';
+        return html;
+    }
+
+    async function searchUser() {
+        const username = document.getElementById('username').value.trim();
+        if (!username) return alert("Please enter a username");
+
+        const response = await fetch(`/user_details/${username}`);
+        const data = await response.json();
+
+        const resultsDiv = document.getElementById('results');
+
+        resultsDiv.innerHTML = `
+    <div style="display: flex; justify-content: center; gap: 40px; flex-wrap: wrap;">
+        <div style="background-color: lightgreen; padding: 12px;">
+            <h3>Basic Metrics</h3>
+            ${Array.isArray(data.basic_metrics) ? createTableFromObject(data.basic_metrics) : `<pre>${JSON.stringify(data.basic_metrics, null, 2)}</pre>`}
+        </div>
+        <div style="background-color:#FFCF79; padding: 12px;">
+            <h3>Top Categories</h3>
+            ${Array.isArray(data.top_categories) ? createTableFromObject(data.top_categories) : `<pre>${JSON.stringify(data.top_categories, null, 2)}</pre>`}
+        </div>
+        <div style="background-color:#E5E4D7; padding: 12px;">
+            <h3>Most Liked By</h3>
+            ${Array.isArray(data.most_liked_by) ? createTableFromObject(data.most_liked_by) : `<pre>${JSON.stringify(data.most_liked_by, null, 2)}</pre>`}
+        </div>
+    </div>
+`;
+
+    }
+</script>
+{% endblock %}
