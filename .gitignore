@@ -1,5 +1,7 @@
 ./env/*
 myenv/*
+venv/*
+*.env
 *yaml
 *csv
 *xlsx
@@ -8,3 +10,9 @@ TP/*
 data/*
 temp.html
 TRASH/*
+*pycache*
+__pycache__/
+*log*
+*temp*
+!templates
+!logging_config.py

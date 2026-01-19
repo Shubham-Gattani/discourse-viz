@@ -4,73 +4,299 @@
 
 {% block content %}
 {% if 'user' in session %}
-<div id="visualizations">
-    <h2>Top-10 users for {{ course_name }}</h2>
-    <div style="overflow-x: auto; white-space: nowrap; max-width: 100%;">
-        {{ latest_visualizations_html }}
+
+{% if error is defined %}
+<div class="error-alert">
+    <p>An error occurred: {{ error }}</p>
+</div>
+{% endif %}
+
+<!-- Master container -->
+<div class="course-dashboard">
+    <!-- First chart section with dropdown -->
+    <div class="chart-section">
+        <h2>Top-10 users for {{ course_name }}</h2>
+        <div class="dropdown-container">
+            <label for="term-select">Select Term:</label>
+            <select id="term-select" class="term-dropdown">
+                {% for term in term_list_for_dropdown %}
+                    <option value="{{ term }}" {% if loop.index == 1 %}selected{% endif %}>{{ term }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="chart-container">
+            <!-- Use iframe to completely isolate the chart -->
+            <iframe id="top-users-iframe" src="/{{ course_name_escaped }}/top_users_chart/{{ term_list_for_dropdown[0] }}" frameborder="0" width="100%"
+                height="500px"></iframe>
+        </div>
     </div>
+
+    <!-- Second chart section -->
+    <div class="chart-section">
+        <h2>Weekwise Engagement Chart for {{ course_name }}</h2>
+        <div class="dropdown-container">
+            <label for="weekwise-term-select">Select Term:</label>
+            <select id="weekwise-term-select" class="term-dropdown">
+                {% for term in term_list_for_dropdown %}
+                    <option value="{{ term }}" {% if loop.index == 1 %}selected{% endif %}>{{ term }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="chart-container">
+            <!-- Use iframe to completely isolate the chart -->
+            <iframe id="weekwise-iframe" src="/{{ course_name_escaped }}/weekwise_chart/{{ term_list_for_dropdown[0] }}" frameborder="0" width="100%"
+                height="500px"></iframe>
+        </div>
+    </div>
+
+    <!-- Most frequent first responders section -->
+    <div class="chart-section">
+        <h2>Most Frequent First Responders</h2>
+        <div class="chart-container" id="most-frequent-first-responders">
+            <p>Loading top responders...it might take a few minutes if there are large number of topics</p>
+        </div>
+    </div>
+
+    <div class="chart-section">
+        <h3>Get charts for specific users</h3>
+        <div class="chart-container">
+            <form id="user-form" method="POST">
+                <label for="usernames">Enter usernames (comma-separated):</label><br>
+                <input type="text" id="usernames" name="user_list" placeholder="e.g., user1,user2,user3" required>
+                <br><br>
+                <div class="dropdown-container">
+                    <label for="specific-users-term-select">Select Term:</label>
+                    <select id="specific-users-term-select" name="selected_term" class="term-dropdown">
+                        {% for term in term_list_for_dropdown %}
+                            <option value="{{ term }}" {% if loop.index == 1 %}selected{% endif %}>{{ term }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <br>
+                <button type="submit" class="submit-btn">Submit</button>
+            </form>
+            <div id="error-message" class="error-text"></div>
+            
+            <!-- Chart will be rendered here after form submission -->
+            <div id="specific-users-chart" style="margin-top: 20px;">
+                <!-- Will be populated after form submission -->
+            </div>
+        </div>
+    </div>
+    <!-- Most Trending Topics section -->
+    <div class="chart-section">
+        <h2>Most Trending Topics in last 7 days on course discussion forum</h2>
+        <div class="chart-container" id="most-trending-topics">
+            <p>Loading trending topics... this may take up to a minute.</p>
+        </div>
+    </div>
+
+
 </div>
 
+<style>
+    .course-dashboard {
+        display: flex;
+        flex-direction: column;
+        gap: 30px;
+        padding: 10px;
+    }
 
+    .chart-section {
+        background-color: #f8f9fa;
+        border-radius: 8px;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+        padding: 15px;
+    }
 
-<div id="specific-users">
-    <h3>Get charts for specific users</h3>
-    <form id="user-form" method="POST">
-        <label for="usernames">Enter usernames (comma-separated):</label><br>
-        <input type="text" id="usernames" name="user_list" placeholder="e.g., user1,user2,user3" required>
-        <br><br>
-        <button type="submit">Submit</button>
-    </form>
-    <div id="error-message" style="color: red;"></div>
-</div>
+    .chart-container {
+        background-color: white;
+        border: 1px solid #e1e4e8;
+        border-radius: 4px;
+        padding: 10px;
+        margin-top: 10px;
+        min-height: 300px;
+    }
 
-<div id="specific-users-chart">
-    <h3>Specific Users Chart</h3>
-    <div id="chart-container" style="width: 100%; overflow-x: auto;"></div>
-</div>
+    .dropdown-container {
+        margin-bottom: 15px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
 
+    .term-dropdown {
+        padding: 8px 12px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        background-color: white;
+        font-size: 14px;
+        cursor: pointer;
+    }
+
+    .term-dropdown:focus {
+        outline: none;
+        border-color: #007bff;
+        box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+    }
+
+    h2,
+    h3 {
+        margin-top: 0;
+        color: #333;
+        border-bottom: 1px solid #ddd;
+        padding-bottom: 8px;
+    }
+
+    .submit-btn {
+        background-color: #007bff;
+        color: white;
+        border: none;
+        padding: 8px 16px;
+        border-radius: 4px;
+        cursor: pointer;
+    }
+
+    .submit-btn:hover {
+        background-color: #0069d9;
+    }
+
+    .error-text {
+        color: #dc3545;
+        margin-top: 10px;
+    }
+
+    .error-alert {
+        background-color: #f8d7da;
+        border: 1px solid #f5c6cb;
+        color: #721c24;
+        padding: 10px;
+        border-radius: 4px;
+        margin-bottom: 20px;
+    }
+
+    iframe {
+        border: none;
+        width: 100%;
+        height: 500px;
+    }
+</style>
 
 <script>
-    document.getElementById("user-form").addEventListener("submit", function (event) {
-        event.preventDefault();
+    // Handle term selection change for top users chart
+    document.getElementById("term-select").addEventListener("change", function() {
+        const selectedTerm = this.value;
+        const courseName = "{{ course_name_escaped }}";
+        const iframe = document.getElementById("top-users-iframe");
+        
+        // Update iframe src with selected term
+        iframe.src = `/${courseName}/top_users_chart/${selectedTerm}`;
+    });
 
-        const form = event.target;
+    // Handle term selection change for weekwise chart
+    document.getElementById("weekwise-term-select").addEventListener("change", function() {
+        const selectedTerm = this.value;
+        const courseName = "{{ course_name_escaped }}";
+        const iframe = document.getElementById("weekwise-iframe");
+        
+        // Update iframe src with selected term
+        iframe.src = `/${courseName}/weekwise_chart/${selectedTerm}`;
+    });
+
+    // Function to fetch and display specific users chart
+    function fetchSpecificUsersChart() {
+        const form = document.getElementById("user-form");
         const formData = new FormData(form);
-        const courseName = "{{ course_name }}";
+        const courseName = "{{ course_name_escaped }}";
+        const userList = formData.get("user_list");
+
+        // Only fetch if user list is not empty
+        if (!userList || userList.trim() === "") {
+            document.getElementById("specific-users-chart").innerHTML = "";
+            document.getElementById("error-message").textContent = "";
+            return;
+        }
 
         fetch(`/${courseName}/get_specific_users_stat`, {
             method: "POST",
             body: formData,
         })
-        .then(response => {
-            if (!response.ok) {
-                return response.json().then(data => {
-                    throw new Error(data.error || "An error occurred");
-                });
-            }
-            return response.text(); // Raw HTML
-        })
-        .then(html => {
-            // Create a Blob from the HTML and generate a URL
-            const blob = new Blob([html], { type: 'text/html' });
-            const url = URL.createObjectURL(blob);
+            .then(response => {
+                if (!response.ok) {
+                    return response.json().then(data => {
+                        throw new Error(data.error || "An error occurred");
+                    });
+                }
+                return response.text(); // Raw HTML
+            })
+            .then(html => {
+                // Create a Blob from the HTML and generate a URL
+                const blob = new Blob([html], { type: 'text/html' });
+                const url = URL.createObjectURL(blob);
 
-            // Inject it into an iframe
-            const iframe = document.createElement("iframe");
-            iframe.src = url;
-            iframe.style.width = "100%";
-            iframe.style.height = "500px";
-            iframe.style.border = "none";
+                // Inject it into an iframe to isolate it
+                const iframe = document.createElement("iframe");
+                iframe.src = url;
+                iframe.style.width = "100%";
+                iframe.style.height = "500px";
+                iframe.style.border = "none";
 
-            const container = document.getElementById("chart-container");
-            container.innerHTML = ""; // Clear old content
-            container.appendChild(iframe);
+                const container = document.getElementById("specific-users-chart");
+                container.innerHTML = ""; // Clear old content
+                container.appendChild(iframe);
 
-            document.getElementById("error-message").textContent = "";
-        })
-        .catch(error => {
-            document.getElementById("error-message").textContent = error.message;
+                document.getElementById("error-message").textContent = "";
+            })
+            .catch(error => {
+                document.getElementById("error-message").textContent = error.message;
+            });
+    }
+
+    // Handle the specific users form submission
+    document.getElementById("user-form").addEventListener("submit", function (event) {
+        event.preventDefault();
+        fetchSpecificUsersChart();
+    });
+
+    // Handle dropdown change for specific users chart
+    document.getElementById("specific-users-term-select").addEventListener("change", function() {
+        fetchSpecificUsersChart();
+    });
+
+    // Load first responders data
+    window.addEventListener("DOMContentLoaded", () => {
+        const courseName = "{{ course_name_escaped }}";
+        fetch(`/get_most_frequent_first_responders/${courseName}`)
+            .then(response => response.text())
+            .then(html => {
+                document.getElementById("most-frequent-first-responders").innerHTML = html;
+            })
+            .catch(err => {
+                document.getElementById("most-frequent-first-responders").innerHTML =
+                    "<p style='color: red;'>Failed to load first responders data.</p>";
+                console.error(err);
+            });
+
+        // Monitor iframe loading
+        document.getElementById("top-users-iframe").addEventListener("load", function () {
+            console.log("Top users chart loaded successfully");
         });
+
+        document.getElementById("weekwise-iframe").addEventListener("load", function () {
+            console.log("Weekwise chart loaded successfully");
+        });
+
+        // Trending topics fetch
+        fetch(`/most_trending_topics/${courseName}`)
+            .then(response => response.text())
+            .then(html => {
+                document.getElementById("most-trending-topics").innerHTML = html;
+            })
+            .catch(err => {
+                document.getElementById("most-trending-topics").innerHTML =
+                    "<p style='color: red;'>Failed to load trending topics.</p>";
+                console.error(err);
+            });
     });
 </script>
 {% endif %}

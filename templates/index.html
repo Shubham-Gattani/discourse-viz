@@ -74,6 +74,25 @@
         font-size: 22px;
     }
 
+    #selected-chart {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        flex-direction: column;
+        margin-top: 10px;
+        /* Reduced from 20px */
+        min-height: auto;
+        /* Remove fixed 800px height */
+        padding: 10px 0;
+        /* Optional: small padding for breathing room */
+    }
+
+
+    #selected-chart h2 {
+        margin-bottom: 10px;
+        /* Reduce spacing between heading and chart */
+    }
+
     iframe {
         max-width: 100%;
         border: none;
@@ -141,15 +160,53 @@
         </ul>
     </div>
 
-    <div class="course-section" id="degree-list">
-        <h2>Degree Level</h2>
+    <!-- DEGREE COURSES FURTHER CATEGORISED -->
+    <div class="course-section" id="core-degree-list">
+        <h2>Core Degree Courses</h2>
         <ul>
-            {% for course in degree_courses %}
+            {% for course in core_degree_courses %}
             <li><a href="/{{ course | lower | replace(' ', '-') }}" target="_blank">{{ course }}</a></li>
-            <!-- <li><a href="/{{ course | replace(' ', '-') }}" target="_blank">{{ course }}</a></li> -->
             {% endfor %}
         </ul>
     </div>
+
+    <div class="course-section" id="degree-level-list">
+        <h2>Degree Level Courses</h2>
+        <ul>
+            {% for course in degree_level_courses %}
+            <li><a href="/{{ course | lower | replace(' ', '-') }}" target="_blank">{{ course }}</a></li>
+            {% endfor %}
+        </ul>
+    </div>
+
+    <div class="course-section" id="l4-degree-list">
+        <h2>L4 Degree Courses</h2>
+        <ul>
+            {% for course in L4_degree_courses %}
+            <li><a href="/{{ course | lower | replace(' ', '-') }}" target="_blank">{{ course }}</a></li>
+            {% endfor %}
+        </ul>
+    </div>
+
+    <div class="course-section" id="l5-degree-list">
+        <h2>L5 Degree Courses</h2>
+        <ul>
+            {% for course in L5_degree_courses %}
+            <li><a href="/{{ course | lower | replace(' ', '-') }}" target="_blank">{{ course }}</a></li>
+            {% endfor %}
+        </ul>
+    </div>
+
+    {% if uncategorized_courses %}
+    <div class="course-section" id="uncategorized-list">
+        <h2>Uncategorized Courses</h2>
+        <ul>
+            {% for course in uncategorized_courses %}
+            <li><a href="/{{ course | lower | replace(' ', '-') }}" target="_blank">{{ course }}</a></li>
+            {% endfor %}
+        </ul>
+    </div>
+    {% endif %}
 </div>
 
 <div id="overall-discourse-dropdown">
@@ -159,7 +216,8 @@
         <select id="chart-select" name="chart" onchange="loadChart()">
             <option value="">Select a chart</option>
             {% for chart in overall_discourse_charts %}
-            <option value="{{ chart }}" {% if latest_term==chart %}selected{% endif %}>
+            <option value="{{ chart }}" {% if latest_term==chart or (not latest_term and loop.first) %}selected{% endif
+                %}>
                 {{ chart.replace('_', ' ').upper() }}
             </option>
             {% endfor %}
@@ -167,59 +225,122 @@
     </form>
 </div>
 
-<div id="selected-chart"
-    style="display: flex; justify-content: center; align-items: center; flex-direction: column; margin-top: 20px; min-height: 800px;">
-    <h2 style="text-align: center; margin-bottom: 20px;">Selected Chart</h2>
+<div id="selected-chart">
+    <h2>Selected Chart</h2>
     <div id="chart-container">
         <!-- The chart HTML will be dynamically loaded here -->
     </div>
 </div>
+
 </div>
 
 <script>
-function loadChart() {
-    const chartSelect = document.getElementById('chart-select');
-    const selectedChart = chartSelect.value;
+    function checkLoadingStatus() {
+        fetch('/loading-status')
+            .then(response => response.json())
+            .then(data => {
+                if (data.loaded) {
+                    console.log("Data fully loaded. Refreshing chart...");
+                    loadChart(); // Refresh the chart when data is ready
+                    clearInterval(statusInterval); // Stop polling
+                } else {
+                    console.log("Data still loading...");
+                }
+            })
+            .catch(error => console.error('Error checking loading status:', error));
+    }
 
-    if (selectedChart) {
-        fetch(`/get_chart?chart=${selectedChart}`)
-            .then(response => response.text())
-            .then(html => {
-                const chartContainer = document.getElementById('chart-container');
-                
-                // Clear the container first
-                chartContainer.innerHTML = html;
+    // Poll every 10 seconds
+    const statusInterval = setInterval(checkLoadingStatus, 10000);
 
-                // Execute all <script> tags manually
-                const scripts = chartContainer.querySelectorAll('script');
-                scripts.forEach(oldScript => {
-                    const newScript = document.createElement('script');
+    function loadChart() {
+        const chartSelect = document.getElementById('chart-select');
+        let selectedChart = chartSelect.value;
 
-                    if (oldScript.src) {
-                        // If script has a src (external script), copy it
-                        newScript.src = oldScript.src;
-                        newScript.async = false; // Keep execution order
-                    } else {
-                        // If inline script, copy the inner text
-                        newScript.textContent = oldScript.textContent;
+        // If no chart is selected, select the first available option
+        if (!selectedChart && chartSelect.options.length > 1) {
+            chartSelect.selectedIndex = 1; // Skip the "Select a chart" option
+            selectedChart = chartSelect.value;
+        }
+
+        console.log('Loading chart:', selectedChart);
+
+        if (selectedChart) {
+            fetch(`/get_chart?chart=${selectedChart}`)
+                .then(response => response.text())
+                .then(html => {
+                    const chartContainer = document.getElementById('chart-container');
+
+                    // Clear the container first
+                    chartContainer.innerHTML = html;
+
+                    // Execute external scripts first, then inline scripts
+                    const scripts = chartContainer.querySelectorAll('script');
+                    const externalScripts = [];
+                    const inlineScripts = [];
+
+                    // Separate external and inline scripts
+                    scripts.forEach(script => {
+                        if (script.src) {
+                            externalScripts.push(script);
+                        } else {
+                            inlineScripts.push(script);
+                        }
+                    });
+
+                    // Load external scripts first
+                    let loadedScripts = 0;
+                    const totalExternalScripts = externalScripts.length;
+
+                    function executeInlineScripts() {
+                        // Execute inline scripts after external scripts are loaded
+                        inlineScripts.forEach(oldScript => {
+                            const newScript = document.createElement('script');
+                            newScript.textContent = oldScript.textContent;
+                            oldScript.parentNode.replaceChild(newScript, oldScript);
+                        });
                     }
 
-                    // Replace the old script with the new one
-                    oldScript.parentNode.replaceChild(newScript, oldScript);
+                    if (totalExternalScripts === 0) {
+                        // No external scripts, execute inline scripts immediately
+                        executeInlineScripts();
+                    } else {
+                        // Load external scripts first
+                        externalScripts.forEach(oldScript => {
+                            const newScript = document.createElement('script');
+                            newScript.src = oldScript.src;
+                            newScript.async = false;
+
+                            newScript.onload = () => {
+                                loadedScripts++;
+                                if (loadedScripts === totalExternalScripts) {
+                                    // All external scripts loaded, now execute inline scripts
+                                    executeInlineScripts();
+                                }
+                            };
+
+                            newScript.onerror = () => {
+                                console.error('Failed to load script:', oldScript.src);
+                                loadedScripts++;
+                                if (loadedScripts === totalExternalScripts) {
+                                    executeInlineScripts();
+                                }
+                            };
+
+                            oldScript.parentNode.replaceChild(newScript, oldScript);
+                        });
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading chart:', error);
+                    document.getElementById('chart-container').innerHTML = '<h3>Error loading chart. Please try again.</h3>';
                 });
-
-            })
-            .catch(error => {
-                console.error('Error loading chart:', error);
-                document.getElementById('chart-container').innerHTML = '<h3>Error loading chart. Please try again.</h3>';
-            });
-    } else {
-        document.getElementById('chart-container').innerHTML = '<h3>Please select a chart.</h3>';
+        } else {
+            document.getElementById('chart-container').innerHTML = '<h3>Please select a chart.</h3>';
+        }
     }
-}
-
-// Load the default chart on page load
-window.onload = loadChart;
+    // Load the default chart on page load
+    window.onload = loadChart;
 
 </script>
 
